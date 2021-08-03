@@ -1,4 +1,8 @@
 import requests
+import configparser
 
-url = 'https://api.telegram.org/bot1798761008:AAFzrfnU7WUj8vqMyZvhx2P9Ql6hlNgzL0k/sendMessage?chat_id=928455104&text=hello'
+config = configparser.ConfigParser()
+config.read('luxorpoolbot.config')
+
+url = 'https://api.telegram.org/bot' + config['TELEGRAM']['ApiKey'] + '/sendMessage?chat_id=928455104&text=hello'
 requests.get(url)

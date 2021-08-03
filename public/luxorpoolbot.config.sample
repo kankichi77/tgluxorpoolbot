@@ -1,0 +1,5 @@
+# Config file for the Telegram Luxor Monitoring Bot
+
+[TELEGRAM]
+ApiKey = API_KEY
+ApiEndPoint = https://api.telegram.org/bot
