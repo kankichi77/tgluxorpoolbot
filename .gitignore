@@ -1,2 +1,5 @@
 .config
+nohup.out
+__pycache__/
+requests.log
 

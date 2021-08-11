@@ -76,16 +76,16 @@ def setApiKey(update: Update, context: CallbackContext) -> int:
     logger.info("PoolInfo for user %s is saved.", tgUser.username)
     update.message.reply_text(
             'API Key saved.\n'
-            'All done!'
-            'Now you can run the /start command.'
+            'All done!\n'
+            'Now you can run the /status command.'
             )
     return ConversationHandler.END
 
 def skip_ApiKey(update: Update, context: CallbackContext) -> int:
     """Skips the API Key"""
     tgUser = update.message.from_user
-    logger.info("User %s did not set an API Key.", tgUser)
-    poolinfo = PoolInfo(tgUser)
+    logger.info("User %s did not set an API Key.", tgUser.username)
+    poolinfo = PoolInfo(tgUser.username)
     poolinfo.pool(
             pool = context.user_data['poolname'],
             uname = context.user_data['poolUsername']
@@ -94,8 +94,8 @@ def skip_ApiKey(update: Update, context: CallbackContext) -> int:
     logger.info("PoolInfo for user %s is saved.", tgUser.username)
     update.message.reply_text(
             "API Key is blank.\n"
-            "All done!"
-            "Now you can run the /start command."
+            "All done!\n"
+            "Now you can run the /status command."
             )
     return ConversationHandler.END
 
@@ -130,14 +130,14 @@ def show_status(update: Update, context: CallbackContext) -> None:
                 active_wk_count = prof_act_wk_count['data']['getProfileActiveWorkers']
                 inactive_wk_count = prof_inact_wk_count['data']['getProfileInactiveWorkers']
                 logger.info("Successfully retrieved Luxor API data for user %s.", pooluser)
+
+                m.append('Latest Worker Hashrate: ' + "{:.2f}".format(latest_worker_hashrate) + ' TH')
+                m.append('Number of Active Workers: ' + active_wk_count)
+                m.append('Number of Inactive Workers: ' + inactive_wk_count)
+                msg = "\n".join(m).join(['\n', '\n'])
             except:
                 logger.info("Error retrieving data from Luxor API for user %s", pooluser)
                 msg = "Error retrieving data from the Pool."
-
-            m.append('Latest Worker Hashrate: ' + "{:.2f}".format(latest_worker_hashrate) + ' TH')
-            m.append('Number of Active Workers: ' + active_wk_count)
-            m.append('Number of Inactive Workers: ' + inactive_wk_count)
-            msg = "\n".join(m).join(['\n', '\n'])
     else:
         msg = "Please set pool information first by using the /start command.\n"
 
