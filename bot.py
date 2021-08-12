@@ -11,6 +11,7 @@ from telegram.ext import (
 from poolinfo import PoolInfo
 from luxor import API
 import configparser
+from poolmonitor import PoolMonitor
 
 config = configparser.ConfigParser()
 config.read('.config')
@@ -23,7 +24,8 @@ SELECTMININGPOOL, SETPOOLUSERNAME, SETAPIKEY = range(3)
 
 def start(update: Update, context: CallbackContext) -> int:
     """Starts the bot and asks the user for the Mining Pool."""
-    logger.info("Starting /start command")
+    tgUser = update.message.from_user
+    logger.info("Starting /start command for User %s", tgUser.username)
     reply_keyboard = [['Luxor']]
     update.message.reply_text(
             'Welcome to the Mining Pool Monitor Bot.\n'
@@ -111,7 +113,8 @@ def cancel(update: Update, context: CallbackContext) -> int:
 
 def show_status(update: Update, context: CallbackContext) -> None:
     """Display the Miner Status."""
-    logger.info("Starting /status command")
+    tgUser = update.message.from_user
+    logger.info("Starting /status command for User %s", tgUser.username)
     poolinfo = PoolInfo(update.message.from_user.username)
     poolinfo.load()
     msg = ''
@@ -121,21 +124,13 @@ def show_status(update: Update, context: CallbackContext) -> None:
             apiEndPoint = 'https://api.beta.luxor.tech/graphql'
             apiKey = p['apikey']
             pooluser = p['uname']
+            poolmonitor = PoolMonitor(p)
             try:
                 logger.info("Accessing Luxor API for user %s ...", pooluser)
-                luxorAPI = API(host = apiEndPoint, method = 'POST', org = 'luxor', key = apiKey)
-                wk_details1H = luxorAPI.get_worker_details_1H(pooluser,'BTC',10)
-                latest_worker_hashrate = wk_details1H['data']['miners']['edges'][0]['node']['details1H']['hashrate']
-                latest_worker_hashrate = float(latest_worker_hashrate)/1000000000000
-                prof_act_wk_count = luxorAPI.get_profile_active_worker_count('BTC')
-                prof_inact_wk_count = luxorAPI.get_profile_inactive_worker_count('BTC')
-                active_wk_count = prof_act_wk_count['data']['getProfileActiveWorkers']
-                inactive_wk_count = prof_inact_wk_count['data']['getProfileInactiveWorkers']
+                m.append('Latest Worker Hashrate: ' + poolmonitor.getCurrentHashrate('TH'))
+                m.append('Number of Active Workers: ' + poolmonitor.getNumberOfOnlineWorkers())
+                m.append('Number of Inactive Workers: ' + poolmonitor.getNumberOfOfflineWorkers())
                 logger.info("Successfully retrieved Luxor API data for user %s.", pooluser)
-
-                m.append('Latest Worker Hashrate: ' + "{:.2f}".format(latest_worker_hashrate) + ' TH')
-                m.append('Number of Active Workers: ' + active_wk_count)
-                m.append('Number of Inactive Workers: ' + inactive_wk_count)
                 msg = "\n".join(m).join(['\n', '\n'])
             except:
                 logger.info("Error retrieving data from Luxor API for user %s", pooluser)
