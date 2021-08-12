@@ -23,6 +23,7 @@ SELECTMININGPOOL, SETPOOLUSERNAME, SETAPIKEY = range(3)
 
 def start(update: Update, context: CallbackContext) -> int:
     """Starts the bot and asks the user for the Mining Pool."""
+    logger.info("Starting /start command")
     reply_keyboard = [['Luxor']]
     update.message.reply_text(
             'Welcome to the Mining Pool Monitor Bot.\n'
@@ -110,6 +111,7 @@ def cancel(update: Update, context: CallbackContext) -> int:
 
 def show_status(update: Update, context: CallbackContext) -> None:
     """Display the Miner Status."""
+    logger.info("Starting /status command")
     poolinfo = PoolInfo(update.message.from_user.username)
     poolinfo.load()
     msg = ''
