@@ -156,8 +156,12 @@ def main() -> None:
         entry_points=[CommandHandler('start',start)],
         states={
             SELECTMININGPOOL: [MessageHandler(Filters.regex('^(Luxor)$'), selectMiningPool)],
-            SETPOOLUSERNAME: [MessageHandler(Filters.text,setPoolUsername)],
+            SETPOOLUSERNAME: [
+                CommandHandler('cancel', cancel),
+                MessageHandler(Filters.text,setPoolUsername),
+                ],
             SETAPIKEY: [
+                CommandHandler('cancel', cancel),
                 CommandHandler('skip', skip_ApiKey),
                 MessageHandler(Filters.text,setApiKey),
                 ],
