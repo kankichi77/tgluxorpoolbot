@@ -3,4 +3,5 @@ nohup.out
 __pycache__/
 requests.log
 *.swp
+*.pid
 
