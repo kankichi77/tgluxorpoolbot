@@ -1,15 +1,20 @@
 import redis
+import configparser
 
 class DB:
-    db = None
-
     def __init__(self):
-        self.db = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
+        self.config = configparser.ConfigParser()
+        self.config.read('.config')
+        self.db = redis.Redis(
+                host='localhost', 
+                port=6379, 
+                db= self.config['BOT']['Redis-DB'], 
+                decode_responses=True)
 
     def set(
             self,
-            key: str = None,
-            value: str = None,
+            key,
+            value,
             ):
         return self.db.set(key, value)
 
