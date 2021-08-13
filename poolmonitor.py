@@ -1,8 +1,8 @@
+from poolmonitor_db import DB
 from luxor import API as API_LUXOR
 import configparser
 
 class PoolMonitor():
-
     def __init__(
             self,
             poolinfo,
@@ -28,7 +28,20 @@ class PoolMonitor():
             ):
         return self.pool.getNumberOfOfflineWorkers()
 
+    def saveNumberOfOfflineWorkers(
+            self,
+            numberOfOfflineWorkers,
+            ):
+        self.pool.saveNumberOfOfflineWorkers(numberOfOfflineWorkers)
+
+    def loadNumberOfOfflineWorkers(
+            self,
+            ):
+        return self.pool.loadNumberOfOfflineWorkers()
+
+
 class PoolMonitor_Luxor():
+    db = DB()
 
     def __init__(
             self,
@@ -59,14 +72,33 @@ class PoolMonitor_Luxor():
             ):
         prof_act_wk_count = self.api.get_profile_active_worker_count('BTC')
         return prof_act_wk_count['data']['getProfileActiveWorkers']
-
+        
     def getNumberOfOfflineWorkers(
             self,
             ):
         prof_inact_wk_count = self.api.get_profile_inactive_worker_count('BTC')
-        return prof_inact_wk_count['data']['getProfileInactiveWorkers']
-        
+        n = prof_inact_wk_count['data']['getProfileInactiveWorkers']
+        self.saveNumberOfOfflineWorkers(n)
+        return n
+
+    def saveNumberOfOfflineWorkers(
+            self,
+            numberOfOfflineWorkers,
+            ):
+        key = 'numberOfOfflineWorkers_' + self.poolinfo['pool'] + '_' + self.poolinfo['uname']
+        self.db.set(key, numberOfOfflineWorkers)
+
+    def loadNumberOfOfflineWorkers(
+            self,
+            ):
+        key = 'numberOfOfflineWorkers_' + self.poolinfo['pool'] + '_' + self.poolinfo['uname']
+        if self.db.exists(key):
+            return int(self.db.get(key))
+        else:
+            return -1
+
 class PoolMonitor_F2():
+    db = DB()
 
     def __init__(
             self,

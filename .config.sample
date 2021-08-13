@@ -1,5 +1,8 @@
 # Config file for the Telegram Luxor Monitoring Bot
 
+[BOT]
+Redis-DB = 3
+
 [TELEGRAM]
 ApiKey = TELEGRAM_BOT_APIKEY
 
