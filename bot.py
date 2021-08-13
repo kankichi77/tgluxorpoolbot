@@ -135,9 +135,12 @@ def getStatusMessage(tgUsername):
             poolmonitor = PoolMonitor(p)
             try:
                 logger.info("Accessing %s API for user %s ...", p['pool'], pooluser)
+                offlineWorkers = poolmonitor.getNumberOfOfflineWorkers()
                 m.append('Latest Worker Hashrate: ' + poolmonitor.getCurrentHashrate('TH'))
                 m.append('Number of Active Workers: ' + poolmonitor.getNumberOfOnlineWorkers())
-                m.append('Number of Inactive Workers: ' + poolmonitor.getNumberOfOfflineWorkers())
+                m.append('Number of Inactive Workers: ' + offlineWorkers)
+                poolmonitor.saveNumberOfOfflineWorkers(offlineWorkers)
+
                 logger.info("Successfully retrieved %s API data for user %s.", p['pool'], pooluser)
                 msg = "\n".join(m).join(['\n', '\n'])
             except:
@@ -166,9 +169,9 @@ def checkOnOfflineStatus(context: CallbackContext) -> None:
             poolmonitor = PoolMonitor(p)
             try:
                 logger.info("Accessing %s API for user %s ...", poolname, pooluser)
-                offlineWorkers = poolmonitor.pool.getNumberOfOfflineWorkers()
+                offlineWorkers = int(poolmonitor.pool.getNumberOfOfflineWorkers())
                 logger.info("offlineWorkers: %s %s", offlineWorkers, type(offlineWorkers))
-                prev = poolmonitor.pool.loadNumberOfOfflineWorkers()
+                prev = int(poolmonitor.pool.loadNumberOfOfflineWorkers())
                 logger.info("pool: %s uname: %s", poolmonitor.pool.poolinfo['pool'], poolmonitor.pool.poolinfo['uname'])
                 logger.info("prev: %s %s", prev, type(prev))
                 if prev != -1:
