@@ -155,7 +155,7 @@ def checkOnOfflineStatus(context: CallbackContext) -> None:
     job = context.job
     chat_id = job.context['chat_id']
     tgUsername = job.context['tgUsername']
-    logger.info("BEGIN: checkOnOfflineStatus() for %s", tgUsername)
+    #logger.info("BEGIN: checkOnOfflineStatus() for %s", tgUsername)
     poolinfo = PoolInfo(tgUsername)
     poolinfo.load()
     msg = ''
@@ -168,31 +168,28 @@ def checkOnOfflineStatus(context: CallbackContext) -> None:
             poolname = p['pool']
             poolmonitor = PoolMonitor(p)
             try:
-                logger.info("Accessing %s API for user %s ...", poolname, pooluser)
+                #logger.info("Accessing %s API for user %s ...", poolname, pooluser)
                 offlineWorkers = int(poolmonitor.pool.getNumberOfOfflineWorkers())
-                logger.info("offlineWorkers: %s %s", offlineWorkers, type(offlineWorkers))
+                #logger.info("offlineWorkers: %s %s", offlineWorkers, type(offlineWorkers))
                 prev = int(poolmonitor.pool.loadNumberOfOfflineWorkers())
-                logger.info("pool: %s uname: %s", poolmonitor.pool.poolinfo['pool'], poolmonitor.pool.poolinfo['uname'])
-                logger.info("prev: %s %s", prev, type(prev))
+                #logger.info("pool: %s uname: %s", poolmonitor.pool.poolinfo['pool'], poolmonitor.pool.poolinfo['uname'])
+                #logger.info("prev: %s %s", prev, type(prev))
                 if prev != -1:
-                    logger.info("prev != -1")
                     if offlineWorkers > 0 and offlineWorkers != prev:
-                        logger.info("offline exists")
                         if offlineWorkers > 1:
                             plural = 'S'
                         msg += str(offlineWorkers) + " WORKER" + plural + " OFFLINE\n"
                         msg += "Pool: " + poolname + "  Username: " + pooluser + "\n"
                     if offlineWorkers == 0 and offlineWorkers != prev:
-                        logger.info("back to online")
                         msg += "All workers are back online."
-                    logger.info("Successfully retrieved %s API data for user %s.", poolname, pooluser)
+                    #logger.info("Successfully retrieved %s API data for user %s.", poolname, pooluser)
                 poolmonitor.pool.saveNumberOfOfflineWorkers(offlineWorkers)
             except:
                 logger.info("ERROR: Error in checkOnOfflineStatus() for user %s", tgUsername)
     if msg != '':
         logger.info("checkOnOfflineStatus(): Send message to user.")
         context.bot.send_message(chat_id, text=msg)
-    logger.info("END: checkOnOfflineStatus() method for user %s", tgUsername)
+    #logger.info("END: checkOnOfflineStatus() method for user %s", tgUsername)
 
 def show_status_scheduled(context: CallbackContext) -> None:
     """Display the Miner Status."""
