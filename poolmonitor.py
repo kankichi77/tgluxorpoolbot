@@ -11,7 +11,7 @@ class PoolMonitor():
             self.pool = PoolMonitor_Luxor(poolinfo)
         if poolinfo['pool'].upper() == 'F2':
             self.pool = PoolMonitor_F2(poolinfo)
-
+"""
     def getCurrentHashrate(
             self,
             unit = None,
@@ -38,17 +38,16 @@ class PoolMonitor():
             self,
             ):
         return self.pool.loadNumberOfOfflineWorkers()
-
+"""
 
 class PoolMonitor_Luxor():
-    db = DB()
-
     def __init__(
             self,
             poolinfo,
             ):
         config = configparser.ConfigParser()
         config.read('.config')
+        self.db = DB()
         apiEndPoint = config['LUXOR']['ApiEndPoint']
         apiKey = poolinfo['apikey']
         self.poolinfo = poolinfo
@@ -78,8 +77,9 @@ class PoolMonitor_Luxor():
             ):
         prof_inact_wk_count = self.api.get_profile_inactive_worker_count('BTC')
         n = prof_inact_wk_count['data']['getProfileInactiveWorkers']
-        self.saveNumberOfOfflineWorkers(n)
-        return n
+        #self.saveNumberOfOfflineWorkers(n)
+        return 1
+        return int(n)
 
     def saveNumberOfOfflineWorkers(
             self,
@@ -93,6 +93,8 @@ class PoolMonitor_Luxor():
             ):
         key = 'numberOfOfflineWorkers_' + self.poolinfo['pool'] + '_' + self.poolinfo['uname']
         if self.db.exists(key):
+            s = self.db.get(key)
+            return int(s)
             return int(self.db.get(key))
         else:
             return -1
