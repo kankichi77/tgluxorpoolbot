@@ -21,6 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SELECTMININGPOOL, SETPOOLUSERNAME, SETAPIKEY = range(3)
+OFFLINEALERTQUERY_INTERVAL = 60 * 5
 
 def start(update: Update, context: CallbackContext) -> int:
     """Starts the bot and asks the user for the Mining Pool."""
@@ -135,11 +136,14 @@ def getStatusMessage(tgUsername):
             poolmonitor = PoolMonitor(p)
             try:
                 logger.info("Accessing %s API for user %s ...", p['pool'], pooluser)
-                offlineWorkers = poolmonitor.getNumberOfOfflineWorkers()
                 m.append('Latest Worker Hashrate: ' + poolmonitor.getCurrentHashrate('TH'))
-                m.append('Number of Active Workers: ' + poolmonitor.getNumberOfOnlineWorkers())
-                m.append('Number of Inactive Workers: ' + offlineWorkers)
-                poolmonitor.saveNumberOfOfflineWorkers(offlineWorkers)
+                online = poolmonitor.getNumberOfOnlineWorkers()
+                offline = poolmonitor.getNumberOfOfflineWorkers()
+                total = online + offline
+                m.append(str(online) + '/' + str(total) + ' Workers Online')
+                #m.append('Number of Active Workers: ' + online)
+                #m.append('Number of Inactive Workers: ' + offline)
+                poolmonitor.saveNumberOfOfflineWorkers(offline)
 
                 logger.info("Successfully retrieved %s API data for user %s.", p['pool'], pooluser)
                 msg = "\n".join(m).join(['\n', '\n'])
@@ -216,7 +220,7 @@ def set_OfflineAlert(update: Update, context: CallbackContext) -> None:
         else:
             interval = interval * 60
         """
-        interval = 10
+        interval = OFFLINEALERTQUERY_INTERVAL 
         jobname = str(chat_id) + '_offlinealert'
         job_removed = remove_job_if_exists(jobname, context)
         ctxt = {
