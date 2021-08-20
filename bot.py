@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SELECTMININGPOOL, SETPOOLUSERNAME, SETAPIKEY = range(3)
-OFFLINEALERTQUERY_INTERVAL = 60 * 5
+OFFLINEALERTQUERY_INTERVAL = 60 * 1
 
 def start(update: Update, context: CallbackContext) -> int:
     """Starts the bot and asks the user for the Mining Pool."""
@@ -117,6 +117,14 @@ def show_status_runonce(update: Update, context: CallbackContext) -> None:
     """Display the Miner Status."""
     tgUser = update.message.from_user
     logger.info("BEGIN: show_status_runonce(): Starting /status command for User %s", tgUser.username)
+    #check on/off status first
+    checkOnOfflineStatus(
+            chat_id = update.message.chat.id,
+            tgUsername = update.message.from_user.username,
+            init_flag = 0,
+            context = context,
+            )
+
     poolmonitor = PoolMonitor(tgUsername = tgUser.username)
     msg = poolmonitor.getStatusMessage()
     update.message.reply_text(
@@ -124,12 +132,25 @@ def show_status_runonce(update: Update, context: CallbackContext) -> None:
     )
     logger.info("END: show_status_runonce()")
 
-def checkOnOfflineStatus(context: CallbackContext) -> None:
+def checkOnOfflineStatus_scheduled(context: CallbackContext) -> None:
     """Send the alarm message."""
     job = context.job
     chat_id = job.context['chat_id']
     tgUsername = job.context['tgUsername']
     init_flag = int(job.context['init'])
+    checkOnOfflineStatus(
+            chat_id = chat_id,
+            tgUsername = tgUsername,
+            init_flag = init_flag,
+            context = context,
+            )
+
+def checkOnOfflineStatus(
+        chat_id,
+        tgUsername,
+        init_flag,
+        context = None,
+        ):
     logger.info("BEGIN: checkOnOfflineStatus() for %s", tgUsername)
     poolmonitor = PoolMonitor(tgUsername = tgUsername)
     msg = ''
@@ -145,7 +166,16 @@ def show_status_scheduled(context: CallbackContext) -> None:
     chat_id = job.context['chat_id']
     tgUsername = job.context['tgUsername']
     logger.info("BEGIN: show_status_scheduled(): Starting /status_scheduled command for User %s", tgUsername)
-    msg = getStatusMessage(tgUsername)
+    #check on/off status first
+    checkOnOfflineStatus(
+            chat_id = chat_id,
+            tgUsername = tgUsername,
+            init_flag = 0,
+            )
+
+
+    poolmonitor = PoolMonitor(tgUsername = tgUsername)
+    msg = poolmonitor.getStatusMessage()
     context.bot.send_message(chat_id, text=(msg))
     logger.info("END: show_status_scheduled()")
 
@@ -183,8 +213,19 @@ def set_OfflineAlert(update: Update, context: CallbackContext) -> None:
         except:
             logger.info("getSecondsUntilNextUpdate(): ERROR")
             first_interval = 5
-        context.job_queue.run_once(checkOnOfflineStatus, 0, context=ctxt_init, name=jobname_init)
-        context.job_queue.run_repeating(checkOnOfflineStatus, interval, first=first_interval, context=ctxt, name=jobname)
+        context.job_queue.run_once(
+                checkOnOfflineStatus_scheduled, 
+                0, 
+                context=ctxt_init, 
+                name=jobname_init
+                )
+        context.job_queue.run_repeating(
+                checkOnOfflineStatus_scheduled, 
+                interval, 
+                first=first_interval, 
+                context=ctxt, 
+                name=jobname
+                )
 
         text = 'Offline Alert activated.'
         if job_removed:
@@ -195,6 +236,7 @@ def set_OfflineAlert(update: Update, context: CallbackContext) -> None:
         update.message.reply_text('Error setting the Offline Alert.\nPlease contact support.')
 
 def getSecondsUntilNextUpdate():
+    return OFFLINEALERTQUERY_INTERVAL 
     now = datetime.now()
     now_min = int(now.strftime('%M'))
     min_to_next = now_min % 5

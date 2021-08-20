@@ -47,6 +47,7 @@ class PoolMonitor():
     def getNumberOfOfflineWorkers(
             self,
             ):
+        #return int(self.pool.db.get("off"))  # DEBUG
         return self.pool.getNumberOfOfflineWorkers()
 
     def saveNumberOfOfflineWorkers(
