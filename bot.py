@@ -12,6 +12,7 @@ from poolinfo import PoolInfo
 from luxor import API
 import configparser
 from poolmonitor import PoolMonitor
+from datetime import datetime
 
 config = configparser.ConfigParser()
 config.read('.config')
@@ -116,91 +117,34 @@ def show_status_runonce(update: Update, context: CallbackContext) -> None:
     """Display the Miner Status."""
     tgUser = update.message.from_user
     logger.info("BEGIN: show_status_runonce(): Starting /status command for User %s", tgUser.username)
-    msg = getStatusMessage(tgUser.username)
+    poolmonitor = PoolMonitor(tgUsername = tgUser.username)
+    msg = poolmonitor.getStatusMessage()
     update.message.reply_text(
         msg
     )
     logger.info("END: show_status_runonce()")
-
-def getStatusMessage(tgUsername):
-    logger.info("BEGIN: getStatusMessage(): tgusername: %s", tgUsername)
-    poolinfo = PoolInfo(tgUsername)
-    poolinfo.load()
-    msg = ''
-    if poolinfo.pools:
-        m = []
-        for p in poolinfo.pools:
-            apiEndPoint = config['LUXOR']['ApiEndPoint']
-            apiKey = p['apikey']
-            pooluser = p['uname']
-            poolmonitor = PoolMonitor(p)
-            try:
-                logger.info("Accessing %s API for user %s ...", p['pool'], pooluser)
-                m.append('Latest Worker Hashrate: ' + poolmonitor.getCurrentHashrate('TH'))
-                online = poolmonitor.getNumberOfOnlineWorkers()
-                offline = poolmonitor.getNumberOfOfflineWorkers()
-                total = online + offline
-                m.append(str(online) + '/' + str(total) + ' Workers Online')
-                #m.append('Number of Active Workers: ' + online)
-                #m.append('Number of Inactive Workers: ' + offline)
-                poolmonitor.saveNumberOfOfflineWorkers(offline)
-
-                logger.info("Successfully retrieved %s API data for user %s.", p['pool'], pooluser)
-                msg = "\n".join(m).join(['\n', '\n'])
-            except:
-                logger.info("Error retrieving data from Luxor API for user %s", pooluser)
-                msg = "Error retrieving data from the Pool."
-    else:
-        msg = "Please set pool information first by using the /start command.\n"
-    return msg
 
 def checkOnOfflineStatus(context: CallbackContext) -> None:
     """Send the alarm message."""
     job = context.job
     chat_id = job.context['chat_id']
     tgUsername = job.context['tgUsername']
-    #logger.info("BEGIN: checkOnOfflineStatus() for %s", tgUsername)
-    poolinfo = PoolInfo(tgUsername)
-    poolinfo.load()
+    init_flag = int(job.context['init'])
+    logger.info("BEGIN: checkOnOfflineStatus() for %s", tgUsername)
+    poolmonitor = PoolMonitor(tgUsername = tgUsername)
     msg = ''
-    plural = ''
-    if poolinfo.pools:
-        for p in poolinfo.pools:
-            apiEndPoint = config['LUXOR']['ApiEndPoint']
-            apiKey = p['apikey']
-            pooluser = p['uname']
-            poolname = p['pool']
-            poolmonitor = PoolMonitor(p)
-            try:
-                #logger.info("Accessing %s API for user %s ...", poolname, pooluser)
-                offlineWorkers = int(poolmonitor.pool.getNumberOfOfflineWorkers())
-                #logger.info("offlineWorkers: %s %s", offlineWorkers, type(offlineWorkers))
-                prev = int(poolmonitor.pool.loadNumberOfOfflineWorkers())
-                #logger.info("pool: %s uname: %s", poolmonitor.pool.poolinfo['pool'], poolmonitor.pool.poolinfo['uname'])
-                #logger.info("prev: %s %s", prev, type(prev))
-                if prev != -1:
-                    if offlineWorkers > 0 and offlineWorkers != prev:
-                        if offlineWorkers > 1:
-                            plural = 'S'
-                        msg += str(offlineWorkers) + " WORKER" + plural + " OFFLINE\n"
-                        msg += "Pool: " + poolname + "  Username: " + pooluser + "\n"
-                    if offlineWorkers == 0 and offlineWorkers != prev:
-                        msg += "All workers are back online."
-                    #logger.info("Successfully retrieved %s API data for user %s.", poolname, pooluser)
-                poolmonitor.pool.saveNumberOfOfflineWorkers(offlineWorkers)
-            except:
-                logger.info("ERROR: Error in checkOnOfflineStatus() for user %s", tgUsername)
+    msg = poolmonitor.checkOnOfflineStatus(tgUsername, init_flag)
     if msg != '':
         logger.info("checkOnOfflineStatus(): Send message to user.")
         context.bot.send_message(chat_id, text=msg)
-    #logger.info("END: checkOnOfflineStatus() method for user %s", tgUsername)
+    logger.info("END: checkOnOfflineStatus() method for user %s", tgUsername)
 
 def show_status_scheduled(context: CallbackContext) -> None:
     """Display the Miner Status."""
     job = context.job
     chat_id = job.context['chat_id']
     tgUsername = job.context['tgUsername']
-    logger.info("BEGIN: show_status_scheduled(): Starting /status command for User %s", tgUsername)
+    logger.info("BEGIN: show_status_scheduled(): Starting /status_scheduled command for User %s", tgUsername)
     msg = getStatusMessage(tgUsername)
     context.bot.send_message(chat_id, text=(msg))
     logger.info("END: show_status_scheduled()")
@@ -209,7 +153,7 @@ def set_OfflineAlert(update: Update, context: CallbackContext) -> None:
     """Activate the On/Offline Alert"""
     tgUser = update.message.from_user
     chat_id = update.message.chat_id
-    logger.info("Starting /set command for user %s", tgUser.username)
+    logger.info("Starting /set_offlinealert command for user %s", tgUser.username)
     try:
         # args[0] should contain the time for hte timer in minutes
         """
@@ -222,21 +166,44 @@ def set_OfflineAlert(update: Update, context: CallbackContext) -> None:
         """
         interval = OFFLINEALERTQUERY_INTERVAL 
         jobname = str(chat_id) + '_offlinealert'
+        jobname_init = jobname + '_init'
         job_removed = remove_job_if_exists(jobname, context)
+        ctxt_init = {
+                'chat_id': str(chat_id),
+                'tgUsername': tgUser.username,
+                'init' : 1
+                }
         ctxt = {
                 'chat_id': str(chat_id),
                 'tgUsername': tgUser.username,
+                'init' : 0
                 }
-        context.job_queue.run_repeating(checkOnOfflineStatus, interval, context=ctxt, name=jobname)
+        try:
+            first_interval = getSecondsUntilNextUpdate()
+        except:
+            logger.info("getSecondsUntilNextUpdate(): ERROR")
+            first_interval = 5
+        context.job_queue.run_once(checkOnOfflineStatus, 0, context=ctxt_init, name=jobname_init)
+        context.job_queue.run_repeating(checkOnOfflineStatus, interval, first=first_interval, context=ctxt, name=jobname)
 
         text = 'Offline Alert activated.'
         if job_removed:
             text += '\n New Interval is set.'
         update.message.reply_text(text)
     except :
-        logger.info("set_OfflineAlert(): Error")
-        update.message.reply_text('Error setting the Offline Alert. Please contact support.')
-            
+        logger.info("ERROR: set_OfflineAlert()")
+        update.message.reply_text('Error setting the Offline Alert.\nPlease contact support.')
+
+def getSecondsUntilNextUpdate():
+    now = datetime.now()
+    now_min = int(now.strftime('%M'))
+    min_to_next = now_min % 5
+    if min_to_next > 0:
+        min_to_next = 5 - min_to_next
+    logger.info("getSecondsUntilNextUpdate(): Now %s", now)
+    logger.info("getSecondsUntilNextUpdate(): %s minutes until the next update", min_to_next)
+    return min_to_next * 60
+
 def set_AutoMonitor(update: Update, context: CallbackContext) -> None:
     """Activate the On/Offline Alert"""
     tgUser = update.message.from_user

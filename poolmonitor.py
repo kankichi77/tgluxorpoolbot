@@ -1,9 +1,30 @@
+import logging
 from poolmonitor_db import DB
 from luxor import API as API_LUXOR
 import configparser
+from poolinfo import PoolInfo
+from datetime import datetime
+
+config = configparser.ConfigParser()
+config.read('.config')
+
+logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class PoolMonitor():
     def __init__(
+            self,
+            tgUsername,
+            poolinfo = None,
+            ):
+        self.tgUsername = tgUsername
+        #poolinfo = PoolInfo(tgUsername)
+        #poolinfo.load()
+        #if poolinfo:
+        #    self.setPoolInfo(poolinfo)
+
+    def setPoolInfo(
             self,
             poolinfo,
             ):
@@ -11,6 +32,7 @@ class PoolMonitor():
             self.pool = PoolMonitor_Luxor(poolinfo)
         if poolinfo['pool'].upper() == 'F2':
             self.pool = PoolMonitor_F2(poolinfo)
+
     def getCurrentHashrate(
             self,
             unit = None,
@@ -38,6 +60,99 @@ class PoolMonitor():
             ):
         return self.pool.loadNumberOfOfflineWorkers()
 
+    def getStatusMessage(
+            self,
+            tgUsername = None,
+            ):
+        if tgUsername:
+            self.tgUsername = tgUsername
+
+        logger.info("BEGIN: getStatusMessage(): tgusername: %s", self.tgUsername)
+        poolinfo = PoolInfo(self.tgUsername)
+        poolinfo.load()
+        msg = ''
+        if poolinfo.pools:
+            m = []
+            for p in poolinfo.pools:
+                apiEndPoint = config['LUXOR']['ApiEndPoint']
+                apiKey = p['apikey']
+                pooluser = p['uname']
+                self.setPoolInfo(p)
+                try:
+                    logger.info("Accessing %s API for user %s ...", p['pool'], pooluser)
+                    try:
+                        currentHashrate =  self.getCurrentHashrate('TH')
+                    except:
+                        logger.info("Error retrieving Current Hashrate")
+                    try:
+                        online = self.getNumberOfOnlineWorkers()
+                    except:
+                        logger.info("Error retrieving Number of Online Workers.")
+                    try:
+                        offline = self.getNumberOfOfflineWorkers()
+                    except:
+                        logger.info("Error retrieving Number Of Offline Workers.")
+                    logger.info("Successfully retrieved %s API data for user %s.", p['pool'], pooluser)
+
+                    try:
+                        self.saveNumberOfOfflineWorkers(offline)
+                    except:
+                        logger.info("Error saving Number of Offline Workers to database")
+                    total = online + offline
+                    m.append('Latest Worker Hashrate: ' + currentHashrate)
+                    m.append(str(online) + '/' + str(total) + ' Workers Online')
+                    msg = "\n".join(m).join(['\n', '\n'])
+                except:
+                    msg = "Error retrieving data from the Pool."
+        else:
+            msg = "Please set pool information first by using the /start command.\n"
+        logger.info("END: getStatusMessage()")
+        return msg
+
+    def checkOnOfflineStatus(
+            self,
+            tgUsername,
+            init,
+            ):
+        """Send the alarm message."""
+        init_flag = init
+        poolinfo = PoolInfo(tgUsername)
+        poolinfo.load()
+        msg = ''
+        plural = ''
+        if poolinfo.pools:
+            for p in poolinfo.pools:
+                apiEndPoint = config['LUXOR']['ApiEndPoint']
+                apiKey = p['apikey']
+                pooluser = p['uname']
+                poolname = p['pool']
+                self.setPoolInfo(p)
+                #poolmonitor = PoolMonitor(p)
+                try:
+                    #logger.info("Accessing %s API for user %s ...", poolname, pooluser)
+                    offlineWorkers = int(self.getNumberOfOfflineWorkers())
+                    #logger.info("offlineWorkers: %s %s", offlineWorkers, type(offlineWorkers))
+                    if init_flag == 1:
+                        prev = 0
+                    else:
+                        prev = int(self.loadNumberOfOfflineWorkers())
+                    #logger.info("pool: %s uname: %s", poolmonitor.pool.poolinfo['pool'], poolmonitor.pool.poolinfo['uname'])
+                    #logger.info("prev: %s %s", prev, type(prev))
+                    logger.info("Offline Workers: prev: %s / now: %s", prev, offlineWorkers)
+                    if prev != -1:
+                        if offlineWorkers > 0 and offlineWorkers != prev:
+                            if offlineWorkers > 1:
+                                plural = 'S'
+                            msg += str(offlineWorkers) + " WORKER" + plural + " OFFLINE\n"
+                            #msg += "Pool: " + poolname + "  Username: " + pooluser + "\n"
+                        if offlineWorkers == 0 and offlineWorkers != prev:
+                            msg += "All workers are back online."
+                        #logger.info("Successfully retrieved %s API data for user %s.", poolname, pooluser)
+                    self.saveNumberOfOfflineWorkers(offlineWorkers)
+                except:
+                    logger.info("ERROR: Error in checkOnOfflineStatus() for user %s", tgUsername)
+        return msg
+
 class PoolMonitor_Luxor():
     def __init__(
             self,
@@ -56,8 +171,8 @@ class PoolMonitor_Luxor():
             unit = None,
             ):
         m = ''
-        wk_details1H = self.api.get_worker_details_1H(self.poolinfo['uname'],'BTC',10)
-        latest_worker_hashrate = wk_details1H['data']['miners']['edges'][0]['node']['details1H']['hashrate']
+        #wk_details1H = self.api.get_worker_details_1H(self.poolinfo['uname'],'BTC',10)
+        #latest_worker_hashrate = wk_details1H['data']['miners']['edges'][0]['node']['details1H']['hashrate']
 
         subaccts = self.api.get_subaccounts(10)
         subs = []
@@ -67,7 +182,9 @@ class PoolMonitor_Luxor():
         for s in subs:
             wk_details1H = self.api.get_worker_details_1H(s,'BTC',10)
             for e in wk_details1H['data']['miners']['edges']:
-                latest_worker_hashrate += float(e['node']['details1H']['hashrate'])
+                status = e['node']['details1H']['status']
+                if status == 'Active':
+                    latest_worker_hashrate += float(e['node']['details1H']['hashrate'])
         if unit == 'TH':
             latest_worker_hashrate = latest_worker_hashrate/1000000000000
             m = "{:.2f}".format(latest_worker_hashrate) + ' TH'
@@ -128,3 +245,7 @@ class PoolMonitor_F2():
             ):
         pass
 
+    def getSecondsUntilNextUpdate(
+            self,
+            ):
+        return 0
