@@ -4,6 +4,7 @@ from luxor import API as API_LUXOR
 import configparser
 from poolinfo import PoolInfo
 from datetime import datetime
+from pm_luxor import PoolMonitor_Luxor
 
 config = configparser.ConfigParser()
 config.read('.config')
@@ -81,28 +82,7 @@ class PoolMonitor():
                 self.setPoolInfo(p)
                 try:
                     logger.info("Accessing %s API for user %s ...", p['pool'], pooluser)
-                    try:
-                        currentHashrate =  self.getCurrentHashrate('TH')
-                    except:
-                        logger.info("Error retrieving Current Hashrate")
-                    try:
-                        online = self.getNumberOfOnlineWorkers()
-                    except:
-                        logger.info("Error retrieving Number of Online Workers.")
-                    try:
-                        offline = self.getNumberOfOfflineWorkers()
-                    except:
-                        logger.info("Error retrieving Number Of Offline Workers.")
-                    logger.info("Successfully retrieved %s API data for user %s.", p['pool'], pooluser)
-
-                    try:
-                        self.saveNumberOfOfflineWorkers(offline)
-                    except:
-                        logger.info("Error saving Number of Offline Workers to database")
-                    total = online + offline
-                    m.append('Latest Worker Hashrate: ' + currentHashrate)
-                    m.append(str(online) + '/' + str(total) + ' Workers Online')
-                    msg = "\n".join(m).join(['\n', '\n'])
+                    msg = self.pool.getStatusMessage(p)
                 except:
                     msg = "Error retrieving data from the Pool."
         else:
@@ -153,7 +133,7 @@ class PoolMonitor():
                 except:
                     logger.info("ERROR: Error in checkOnOfflineStatus() for user %s", tgUsername)
         return msg
-
+"""
 class PoolMonitor_Luxor():
     def __init__(
             self,
@@ -250,3 +230,4 @@ class PoolMonitor_F2():
             self,
             ):
         return 0
+"""
